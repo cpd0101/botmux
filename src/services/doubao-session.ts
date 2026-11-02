@@ -7,7 +7,7 @@
  */
 
 import { homedir } from 'node:os';
-import { join } from 'node:path';
+import { isAbsolute, join, resolve } from 'node:path';
 
 export type DoubaoPermission = 'AlwaysAsk' | 'AskOnRisk' | 'FullAccess';
 export type DoubaoSessionAction = 'create' | 'send' | 'wait' | 'stop' | 'status';
@@ -36,6 +36,12 @@ export interface BuildDoubaoSessionArgsInput {
   mode?: DoubaoSessionMode;
   workspace?: string;
   runtime?: DoubaoRuntime;
+  /**
+   * Headless local noninteractive consent (`DOUBAO_YES`).
+   * Requires a doubao-cli that accepts `--yes` on sessions create/send/wait
+   * (preview branch / newer headless); official desktop-only `--yes` is CDP launch.
+   */
+  yes?: boolean;
   /** Seconds passed to doubao `--timeout`. Omit → doubao-cli default. */
   timeoutSeconds?: number;
   wait?: boolean;
@@ -174,6 +180,32 @@ export function resolveDoubaoPermission(envPermission?: string | null): DoubaoPe
   throw new Error(`invalid doubao permission: ${envPermission}; expected AlwaysAsk|AskOnRisk|FullAccess`);
 }
 
+/** Optional `--yes` (1/true/yes); empty/false → omit. */
+export function resolveDoubaoYes(envYes?: string | null | boolean): boolean {
+  if (envYes === true) return true;
+  if (envYes === false || envYes == null) return false;
+  const trimmed = String(envYes).trim().toLowerCase();
+  return trimmed === '1' || trimmed === 'true' || trimmed === 'yes';
+}
+
+/**
+ * Expand `~` / `~/…` in DOUBAO_WORKSPACE. bots.json / botconfig env values are
+ * not shell-expanded, and doubao path.resolve would otherwise turn `~/botmux`
+ * into `<cwd>/~/botmux`.
+ */
+export function resolveDoubaoWorkspace(
+  workspace?: string | null,
+  home: string = homedir(),
+): string | undefined {
+  const trimmed = workspace?.trim();
+  if (!trimmed) return undefined;
+  if (trimmed === '~') return home;
+  if (trimmed.startsWith('~/') || trimmed.startsWith('~\\')) {
+    return resolve(home, trimmed.slice(2));
+  }
+  return isAbsolute(trimmed) ? trimmed : resolve(trimmed);
+}
+
 /**
  * Build argv for one doubao sessions subcommand (no binary name).
  * Flags come before `--` / positionals so option parsing does not swallow the
@@ -206,10 +238,19 @@ export function buildDoubaoSessionArgs(input: BuildDoubaoSessionArgsInput): stri
     if (runtime) args.push('--runtime', runtime);
     const mode = resolveDoubaoMode(input.mode);
     if (mode) args.push('--mode', mode);
-    if (input.workspace?.trim()) args.push('--workspace', input.workspace.trim());
+    const workspace = resolveDoubaoWorkspace(input.workspace);
+    if (workspace) args.push('--workspace', workspace);
     const permission = resolveDoubaoPermission(input.permission);
     if (permission) args.push('--permission', permission);
     if (input.model?.trim()) args.push('--model', input.model.trim());
+  }
+
+  // create/send/wait on headless preview: confirm FullAccess / auto-approve tools.
+  if (
+    resolveDoubaoYes(input.yes)
+    && (input.action === 'create' || input.action === 'send' || input.action === 'wait')
+  ) {
+    args.push('--yes');
   }
 
   if (input.timeoutSeconds !== undefined && Number.isFinite(input.timeoutSeconds) && input.timeoutSeconds > 0) {

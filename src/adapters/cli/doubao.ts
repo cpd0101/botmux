@@ -10,6 +10,7 @@ import {
   resolveDoubaoPermission,
   resolveDoubaoPlatform,
   resolveDoubaoRuntime,
+  resolveDoubaoYes,
 } from '../../services/doubao-session.js';
 
 function pushOpt(args: string[], key: string, value: string | undefined): void {
@@ -69,6 +70,7 @@ export function createDoubaoAdapter(pathOverride?: string): CliAdapter {
       pushOpt(args, '--runtime', resolveDoubaoRuntime(envVal(env, 'DOUBAO_RUNTIME')));
       pushOpt(args, '--permission', resolveDoubaoPermission(envVal(env, 'DOUBAO_PERMISSION')));
       pushOpt(args, '--workspace', envVal(env, 'DOUBAO_WORKSPACE'));
+      if (resolveDoubaoYes(envVal(env, 'DOUBAO_YES'))) args.push('--yes', '1');
       pushOpt(args, '--timeout-seconds', envVal(env, 'DOUBAO_TURN_TIMEOUT_SECONDS'));
       return args;
     },

@@ -30,6 +30,7 @@ import {
   resolveDoubaoPermission,
   resolveDoubaoPlatform,
   resolveDoubaoRuntime,
+  resolveDoubaoYes,
   type DoubaoPermission,
   type DoubaoRuntime,
   type DoubaoSessionMode,
@@ -46,6 +47,7 @@ interface Args {
   mode?: DoubaoSessionMode;
   runtime?: DoubaoRuntime;
   workspace?: string;
+  yes?: string;
   timeoutSeconds?: string;
 }
 
@@ -76,6 +78,7 @@ function parseArgs(argv: string[]): Args {
       o.runtime = resolveDoubaoRuntime(value);
     },
     '--workspace': 'workspace',
+    '--yes': 'yes',
     '--timeout-seconds': 'timeoutSeconds',
   });
   return out;
@@ -127,6 +130,7 @@ class DoubaoClient {
   private readonly mode?: DoubaoSessionMode;
   private readonly runtime?: DoubaoRuntime;
   private readonly workspace?: string;
+  private readonly yes: boolean;
   private readonly timeoutSeconds?: number;
   private cdpReady = false;
 
@@ -140,6 +144,7 @@ class DoubaoClient {
     this.mode = resolveDoubaoMode(args.mode);
     this.runtime = resolveDoubaoRuntime(args.runtime);
     this.workspace = args.workspace?.trim() || undefined;
+    this.yes = resolveDoubaoYes(args.yes);
     this.timeoutSeconds = optionalTimeoutSeconds(args.timeoutSeconds);
   }
 
@@ -327,6 +332,8 @@ class DoubaoClient {
       mode: input.action === 'create' ? this.mode : undefined,
       workspace: turnAction ? this.workspace : undefined,
       runtime: turnAction ? this.runtime : undefined,
+      // wait also accepts --yes on headless preview (FullAccess recovery).
+      yes: this.yes || undefined,
       timeoutSeconds: this.timeoutSeconds,
       wait: true,
     });

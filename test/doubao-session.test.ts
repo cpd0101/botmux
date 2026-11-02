@@ -16,6 +16,8 @@ import {
   resolveDoubaoPermission,
   resolveDoubaoPlatform,
   resolveDoubaoRuntime,
+  resolveDoubaoWorkspace,
+  resolveDoubaoYes,
 } from '../src/services/doubao-session.js';
 import { createDoubaoAdapter } from '../src/adapters/cli/doubao.js';
 
@@ -72,6 +74,15 @@ describe('doubao-session helpers', () => {
     expect(resolveDoubaoPermission(undefined)).toBeUndefined();
     expect(resolveDoubaoPermission('FullAccess')).toBe('FullAccess');
     expect(() => resolveDoubaoPermission('none')).toThrow(/AlwaysAsk\|AskOnRisk\|FullAccess/);
+    expect(resolveDoubaoYes(undefined)).toBe(false);
+    expect(resolveDoubaoYes('0')).toBe(false);
+    expect(resolveDoubaoYes('1')).toBe(true);
+    expect(resolveDoubaoYes('YES')).toBe(true);
+    expect(resolveDoubaoYes(true)).toBe(true);
+    expect(resolveDoubaoWorkspace(undefined)).toBeUndefined();
+    expect(resolveDoubaoWorkspace('~/botmux', '/Users/x')).toBe('/Users/x/botmux');
+    expect(resolveDoubaoWorkspace('~', '/Users/x')).toBe('/Users/x');
+    expect(resolveDoubaoWorkspace('/abs/ws', '/Users/x')).toBe('/abs/ws');
   });
 
   it('resolves config dir with env override and platform defaults', () => {
@@ -102,7 +113,8 @@ describe('doubao-session helpers', () => {
       runtime: 'local',
       mode: 'goal',
       workspace: '/tmp/ws',
-      permission: 'AskOnRisk',
+      permission: 'FullAccess',
+      yes: true,
       model: 'Orange 5.5',
       timeoutSeconds: 600,
       platform: 'headless',
@@ -113,12 +125,24 @@ describe('doubao-session helpers', () => {
       '--runtime', 'local',
       '--mode', 'goal',
       '--workspace', '/tmp/ws',
-      '--permission', 'AskOnRisk',
+      '--permission', 'FullAccess',
       '--model', 'Orange 5.5',
+      '--yes',
       '--timeout', '600',
       '--json',
       '--', 'plan',
     ]);
+
+    const withTilde = buildDoubaoSessionArgs({
+      action: 'create',
+      message: 'ls',
+      runtime: 'local',
+      workspace: '~/botmux',
+    });
+    const wsIdx = withTilde.indexOf('--workspace');
+    expect(wsIdx).toBeGreaterThan(-1);
+    expect(withTilde[wsIdx + 1]).not.toContain('~/');
+    expect(withTilde[wsIdx + 1]).toMatch(/botmux$/);
   });
 
   it('builds send argv with conversation id and wait argv without message', () => {
@@ -225,7 +249,8 @@ describe('createDoubaoAdapter', () => {
         DOUBAO_PLATFORM: 'headless',
         DOUBAO_MODE: 'goal',
         DOUBAO_RUNTIME: 'local',
-        DOUBAO_PERMISSION: 'AskOnRisk',
+        DOUBAO_PERMISSION: 'FullAccess',
+        DOUBAO_YES: '1',
         DOUBAO_WORKSPACE: '/tmp/ws',
         DOUBAO_TURN_TIMEOUT_SECONDS: '300',
       },
@@ -239,7 +264,9 @@ describe('createDoubaoAdapter', () => {
     expect(resumed).toContain('--runtime');
     expect(resumed).toContain('local');
     expect(resumed).toContain('--permission');
-    expect(resumed).toContain('AskOnRisk');
+    expect(resumed).toContain('FullAccess');
+    expect(resumed).toContain('--yes');
+    expect(resumed).toContain('1');
     expect(resumed).toContain('--workspace');
     expect(resumed).toContain('/tmp/ws');
     expect(resumed).toContain('--timeout-seconds');
