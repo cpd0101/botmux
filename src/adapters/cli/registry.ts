@@ -40,6 +40,7 @@ import { createMojoAdapter } from './mojo.js';
 import { createMinimaxAdapter } from './minimax.js';
 import { createRemoteRunnerAdapter } from './remote-runner.js';
 import { createZcodeAdapter } from './zcode.js';
+import { createDoubaoAdapter } from './doubao.js';
 import { retiredCli, retiredCliNotice } from './retired-cli.js';
 
 /**
@@ -98,6 +99,8 @@ const RAW_CLI_EXECUTABLES: Readonly<Record<CliId, string | undefined>> = {
   'remote-runner': 'botmux-remote-runner',
   codem: 'codem',
   zcode: 'zcode',
+  // Long-lived runner wraps doubao-cli sessions API; doubao is the real binary.
+  doubao: 'doubao',
 };
 
 /**
@@ -313,7 +316,7 @@ export async function createCliAdapter(id: CliId, pathOverride?: string, opts?: 
   return adapter;
 }
 
-export { createClaudeCodeAdapter, createSeedAdapter, createRelayAdapter, createAidenAdapter, createCocoAdapter, createCodexAdapter, createCodexAppAdapter, createCursorAdapter, createGeniusAdapter, createOpenCodeAdapter, createOpenCode2Adapter, createMiMoCodeAdapter, createAntigravityAdapter, createMtrAdapter, createHermesAdapter, createMiraAdapter, createMirAdapter, createTraexAdapter, createPiAdapter, createCopilotAdapter, createOhMyPiAdapter, createEbsdAdapter, createKimiAdapter, createCodemAdapter, createGrokAdapter, createKiroCliAdapter, createRiffAdapter, createReasonixAdapter, createDshAdapter, createDshTuiAdapter, createMojoAdapter, createMinimaxAdapter, createRemoteRunnerAdapter, createZcodeAdapter };
+export { createClaudeCodeAdapter, createSeedAdapter, createRelayAdapter, createAidenAdapter, createCocoAdapter, createCodexAdapter, createCodexAppAdapter, createCursorAdapter, createGeniusAdapter, createOpenCodeAdapter, createOpenCode2Adapter, createMiMoCodeAdapter, createAntigravityAdapter, createMtrAdapter, createHermesAdapter, createMiraAdapter, createMirAdapter, createTraexAdapter, createPiAdapter, createCopilotAdapter, createOhMyPiAdapter, createEbsdAdapter, createKimiAdapter, createCodemAdapter, createGrokAdapter, createKiroCliAdapter, createRiffAdapter, createReasonixAdapter, createDshAdapter, createDshTuiAdapter, createMojoAdapter, createMinimaxAdapter, createRemoteRunnerAdapter, createZcodeAdapter, createDoubaoAdapter };
 
 /** Synchronous version for use in worker process. */
 export function createCliAdapterSync(id: CliId, pathOverride?: string, opts?: CliAdapterOptions): CliAdapter {
@@ -352,6 +355,7 @@ export function createCliAdapterSync(id: CliId, pathOverride?: string, opts?: Cl
     case 'minimax': return createMinimaxAdapter(pathOverride);
     case 'remote-runner': return createRemoteRunnerAdapter(pathOverride);
     case 'zcode': return createZcodeAdapter(pathOverride);
+    case 'doubao': return createDoubaoAdapter(pathOverride);
     default:
       // A session persisted on a removed CLI (e.g. switched with `/cli gemini`)
       // fails with the migration notice, not a bare "unknown adapter".

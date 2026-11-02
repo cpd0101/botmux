@@ -60,6 +60,8 @@ export const CLI_ID_CHOICES: Record<string, CliId> = {
   '32': 'remote-runner',
   '33': 'codem',
   '34': 'zcode',
+  // 新增 CLI 一律追加到尾部：序号是脚本化 setup 的稳定接口，插位会让老脚本静默选错 CLI。
+  '35': 'doubao',
 };
 
 const VALID_CLI_IDS: ReadonlySet<string> = new Set(Object.values(CLI_ID_CHOICES));

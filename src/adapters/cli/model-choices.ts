@@ -98,4 +98,6 @@ export const CLI_MODEL_CHOICES: Readonly<Record<CliId, readonly string[] | undef
   'codem': undefined,
   // Personal providers are discovered on demand; never perform I/O here.
   zcode: undefined,
+  // Live catalog comes from `doubao models --json` when CDP/login is ready.
+  doubao: undefined,
 };

@@ -18443,6 +18443,7 @@ if (__entrySubcommand) {
   else if (__entrySubcommand === 'dsh-runner') await import('./dsh-runner.js');
   else if (__entrySubcommand === 'mira-runner') await import('./mira-runner.js');
   else if (__entrySubcommand === 'mir-runner') await import('./mir-runner.js');
+  else if (__entrySubcommand === 'doubao-runner') await import('./doubao-runner.js');
   else if (__entrySubcommand === 'lark-tool-runner') {
     await import('./lark-tool-runner.js');
     process.exit(process.exitCode ?? 0);

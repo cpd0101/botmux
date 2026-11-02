@@ -44,4 +44,5 @@ export const modelOnlyAssessments: Readonly<Record<CliId, ModelOnlyAssessment>> 
   zcode: { group: 'native-tui', status: 'verification_required', reason: 'model_only_unverified', detail: '本地接入保留完整 ZCode Agent；未验证纯模型零工具协议，不宣称该能力。' },
   'remote-runner': { group: 'remote-agent', status: 'interface_gap', reason: 'provider_controls_agent_loop', detail: '执行由外置 provider 管理；是否支持纯模型、空工具和隔离凭据取决于 provider 声明与内部验收。' },
   codem: { group: 'native-print', status: 'verification_required', reason: 'native_model_only_isolation_unverified', detail: '本地适配器接入 CodeM TUI；原生 -p/--sse 仍运行 Agent 工具，尚未验证空工具及独立认证的 model-only 契约。' },
+  doubao: { group: 'sessions-api', status: 'interface_gap', reason: 'agent_loop_not_model_only', detail: '现有接入是 doubao-cli sessions create/send；桌面/Headless 保留完整 Agent 与本地工具，尚无已核实的纯模型、零工具契约。' },
 };

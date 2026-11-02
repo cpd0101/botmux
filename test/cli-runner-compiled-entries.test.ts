@@ -49,6 +49,7 @@ import { createDshAdapter } from '../src/adapters/cli/dsh.js';
 import { createMiraAdapter } from '../src/adapters/cli/mira.js';
 import { createMinimaxAdapter } from '../src/adapters/cli/minimax.js';
 import { createMirAdapter } from '../src/adapters/cli/mir.js';
+import { createDoubaoAdapter } from '../src/adapters/cli/doubao.js';
 
 const REPO_ROOT = resolve(fileURLToPath(new URL('..', import.meta.url)));
 const REAL_ARGV1 = process.argv[1];
@@ -63,6 +64,7 @@ const ADAPTERS: ReadonlyArray<{ id: string; entry: BotmuxEntry; make: () => { bu
   { id: 'mira', entry: 'mira-runner', make: () => createMiraAdapter() as never },
   { id: 'minimax', entry: 'minimax-runner', make: () => createMinimaxAdapter('/bin/true') as never },
   { id: 'mir', entry: 'mir-runner', make: () => createMirAdapter() as never },
+  { id: 'doubao', entry: 'doubao-runner', make: () => createDoubaoAdapter('/bin/true') as never },
 ];
 
 const BUILD_ARGS_INPUT = {
@@ -104,7 +106,7 @@ describe('CLI-adapter runners — compiled binary form', () => {
     // fleet entries, whose launch path is resolveEntrySpawn, not this one.
     expect([...RUNNER_ENTRIES]).toEqual([
       'codex-app-runner', 'dsh-runner', 'mira-runner', 'mir-runner',
-      'minimax-runner', 'lark-tool-runner', 'cli-identity-runner',
+      'minimax-runner', 'doubao-runner', 'lark-tool-runner', 'cli-identity-runner',
     ]);
   });
 });

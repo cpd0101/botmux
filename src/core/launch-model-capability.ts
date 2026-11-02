@@ -32,6 +32,8 @@ export const LAUNCH_MODEL_CLI_IDS: ReadonlySet<CliId> = new Set<CliId>([
   'mojo',
   // ZCode receives a validated session-specific provider config in worker.
   'zcode',
+  // doubao-runner forwards --model into doubao sessions create/send.
+  'doubao',
 ]);
 
 /**

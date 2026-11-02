@@ -76,6 +76,8 @@ describe('native skill discovery reaches every CLI that ships skills', () => {
       // MiniMax Code loads native skills from its persistent data directory.
       minimax: 'global',
       zcode: 'global',
+      // doubao-cli sessions runner; no Botmux skill-directory delivery.
+      doubao: 'none',
     };
     // Two-way key equality. `Record<CliId, …>` looks like tsc enforces
     // exhaustiveness, but this file lives in test/ and tsconfig only includes
