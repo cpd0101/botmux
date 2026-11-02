@@ -8,6 +8,10 @@ import {
   doubaoNeedsWait,
   extractDoubaoReplyText,
   parseDoubaoSessionResult,
+  buildDoubaoRuntimesArgs,
+  isDoubaoCdpUnavailableError,
+  isDoubaoLocalRuntimeNotReadyError,
+  isDoubaoLocalRuntimeReady,
   resolveDoubaoMode,
   resolveDoubaoPermission,
   resolveDoubaoPlatform,
@@ -30,6 +34,30 @@ describe('doubao-session helpers', () => {
     expect(buildDoubaoCdpArgs('launch', 'work')).toEqual([
       '--platform', 'work', 'cdp', 'launch', '--yes', '--json',
     ]);
+    expect(buildDoubaoRuntimesArgs('work')).toEqual([
+      '--platform', 'work', 'runtimes', '--json',
+    ]);
+  });
+
+  it('detects CDP / local-runtime recoveries', () => {
+    expect(isDoubaoCdpUnavailableError(
+      'doubao: DoubaoWork CDP is unavailable at http://127.0.0.1:9226. Run "doubao --platform work cdp launch" to enable CDP.',
+    )).toBe(true);
+    expect(isDoubaoCdpUnavailableError('sessions send: doubao produced empty stdout; detail: CDP is unavailable')).toBe(true);
+    expect(isDoubaoCdpUnavailableError('timeout waiting for reply')).toBe(false);
+    expect(isDoubaoCdpUnavailableError('')).toBe(false);
+
+    expect(isDoubaoLocalRuntimeNotReadyError(
+      'doubao: Doubao local runtime is not ready; check "doubao runtimes" and initialize 本地电脑 in the app',
+    )).toBe(true);
+    expect(isDoubaoLocalRuntimeNotReadyError('timeout waiting for reply')).toBe(false);
+
+    expect(isDoubaoLocalRuntimeReady({
+      runtimes: [{ id: 'local', available: true, status: 'READY', deviceId: '1' }],
+    })).toBe(true);
+    expect(isDoubaoLocalRuntimeReady({
+      runtimes: [{ id: 'local', available: false, status: 'PENDING' }],
+    })).toBe(false);
   });
 
   it('omits mode / runtime / permission unless explicitly set', () => {

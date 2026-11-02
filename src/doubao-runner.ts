@@ -17,10 +17,14 @@ import { errorMessage } from './utils/error-message.js';
 import { createRunnerTerminal, parseRunnerFlags } from './runner-common.js';
 import {
   buildDoubaoCdpArgs,
+  buildDoubaoRuntimesArgs,
   buildDoubaoSessionArgs,
   doubaoNeedsDesktopCdp,
   doubaoNeedsWait,
   extractDoubaoReplyText,
+  isDoubaoCdpUnavailableError,
+  isDoubaoLocalRuntimeNotReadyError,
+  isDoubaoLocalRuntimeReady,
   parseDoubaoSessionResult,
   resolveDoubaoMode,
   resolveDoubaoPermission,
@@ -47,6 +51,9 @@ interface Args {
 
 const MARKER_PREFIX = '::botmux-doubao:';
 const MAX_WAIT_ROUNDS = 8;
+/** Desktop local runtime often lags CDP after app relaunch. */
+const LOCAL_RUNTIME_WAIT_MS = 90_000;
+const LOCAL_RUNTIME_POLL_MS = 1_500;
 
 const output = new RunnerControlWriter();
 const { emitMarker, writeLine, prompt } = createRunnerTerminal(output);
@@ -142,9 +149,19 @@ class DoubaoClient {
     }
   }
 
-  /** macOS Desktop path: ensure CDP like `doubao cdp launch` before sessions. */
-  private async ensureDesktopCdp(): Promise<void> {
-    if (this.cdpReady || !doubaoNeedsDesktopCdp(this.platform)) return;
+  /** Desktop defaults to local runtime; skip wait when explicitly on cloud. */
+  private needsLocalRuntime(): boolean {
+    return doubaoNeedsDesktopCdp(this.platform) && this.runtime !== 'cloud';
+  }
+
+  /**
+   * Desktop path: ensure CDP like `doubao cdp launch`.
+   * `force` clears the ready cache so a later disconnect can relaunch.
+   */
+  private async ensureDesktopCdp(force = false): Promise<void> {
+    if (!doubaoNeedsDesktopCdp(this.platform)) return;
+    if (force) this.cdpReady = false;
+    if (this.cdpReady) return;
 
     const statusArgv = buildDoubaoCdpArgs('status', this.platform);
     const statusRun = await runDoubao(this.bin, statusArgv, this.cwd);
@@ -175,22 +192,72 @@ class DoubaoClient {
     this.cdpReady = true;
   }
 
+  /**
+   * Wait until Desktop 本地电脑 is READY. CDP drops during this wait are
+   * relaunched in-place — we do not switch to cloud.
+   */
+  private async ensureLocalRuntimeReady(): Promise<void> {
+    if (!this.needsLocalRuntime()) return;
+
+    const deadline = Date.now() + LOCAL_RUNTIME_WAIT_MS;
+    let announced = false;
+    while (Date.now() < deadline) {
+      const run = await runDoubao(this.bin, buildDoubaoRuntimesArgs(this.platform), this.cwd);
+      const detail = `${run.stderr}\n${run.stdout}`;
+      if (isDoubaoCdpUnavailableError(detail)) {
+        writeLine('[doubao] CDP lost while checking 本地电脑; relaunching CDP…');
+        await this.ensureDesktopCdp(true);
+        continue;
+      }
+      try {
+        const payload = JSON.parse(run.stdout.trim()) as unknown;
+        if (isDoubaoLocalRuntimeReady(payload)) return;
+      } catch {
+        // keep polling
+      }
+      if (!announced) {
+        writeLine('[doubao] waiting for 本地电脑 runtime…');
+        announced = true;
+      }
+      await new Promise(resolve => setTimeout(resolve, LOCAL_RUNTIME_POLL_MS));
+    }
+
+    throw new Error(
+      'doubao local runtime is not ready after waiting; open DoubaoWork, select 本地电脑 once, then retry',
+    );
+  }
+
+  private async prepareDesktop(): Promise<void> {
+    await this.ensureDesktopCdp();
+    await this.ensureLocalRuntimeReady();
+  }
+
+  private async recoverDesktopAndRetry<T>(err: unknown, retry: () => Promise<T>): Promise<T> {
+    const message = errorMessage(err);
+    if (isDoubaoCdpUnavailableError(message)) {
+      writeLine('[doubao] CDP lost; relaunching and retrying…');
+      await this.ensureDesktopCdp(true);
+      await this.ensureLocalRuntimeReady();
+      return retry();
+    }
+    if (isDoubaoLocalRuntimeNotReadyError(message)) {
+      writeLine('[doubao] local runtime not ready; relaunching CDP and retrying…');
+      await this.ensureDesktopCdp(true);
+      await this.ensureLocalRuntimeReady();
+      return retry();
+    }
+    throw err;
+  }
+
   async complete(content: string): Promise<{ finalText: string; turnId: string }> {
     const startedAt = Date.now();
-    await this.ensureDesktopCdp();
+    await this.prepareDesktop();
     let result: DoubaoSessionResult;
 
-    if (this.conversationId) {
-      result = await this.exec({
-        action: 'send',
-        conversationId: this.conversationId,
-        message: content,
-      }, 'sessions send');
-    } else {
-      result = await this.exec({
-        action: 'create',
-        message: content,
-      }, 'sessions create');
+    try {
+      result = await this.runTurn(content);
+    } catch (err) {
+      result = await this.recoverDesktopAndRetry(err, () => this.runTurn(content));
     }
 
     this.rememberConversation(result);
@@ -199,11 +266,19 @@ class DoubaoClient {
     while (doubaoNeedsWait(result) && waitRound < MAX_WAIT_ROUNDS) {
       waitRound += 1;
       writeLine(`[doubao] waiting for run ${result.runId} (round ${waitRound})…`);
-      result = await this.exec({
-        action: 'wait',
-        conversationId: result.conversationId!,
-        runId: result.runId!,
-      }, 'sessions wait');
+      try {
+        result = await this.exec({
+          action: 'wait',
+          conversationId: result.conversationId!,
+          runId: result.runId!,
+        }, 'sessions wait');
+      } catch (err) {
+        result = await this.recoverDesktopAndRetry(err, () => this.exec({
+          action: 'wait',
+          conversationId: result.conversationId!,
+          runId: result.runId!,
+        }, 'sessions wait'));
+      }
       this.rememberConversation(result);
     }
 
@@ -214,6 +289,20 @@ class DoubaoClient {
       throw new Error(`doubao turn unfinished: ${err}`);
     }
     return { finalText: text, turnId: result.runId || `doubao-${startedAt}` };
+  }
+
+  private async runTurn(content: string): Promise<DoubaoSessionResult> {
+    if (this.conversationId) {
+      return this.exec({
+        action: 'send',
+        conversationId: this.conversationId,
+        message: content,
+      }, 'sessions send');
+    }
+    return this.exec({
+      action: 'create',
+      message: content,
+    }, 'sessions create');
   }
 
   private rememberConversation(result: DoubaoSessionResult): void {

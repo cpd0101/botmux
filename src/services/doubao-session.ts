@@ -106,6 +106,50 @@ export function buildDoubaoCdpArgs(
   return args;
 }
 
+/** Detect Desktop CDP-down errors from doubao-cli stderr / thrown messages. */
+export function isDoubaoCdpUnavailableError(text: string | undefined | null): boolean {
+  if (!text) return false;
+  const lower = text.toLowerCase();
+  return lower.includes('cdp is unavailable')
+    || lower.includes('cdp_unavailable')
+    || /run ["']?doubao(?: --platform \w+)? cdp launch/i.test(text);
+}
+
+/** Desktop default runtime is local; fails until 本地电脑 is READY in the app. */
+export function isDoubaoLocalRuntimeNotReadyError(text: string | undefined | null): boolean {
+  if (!text) return false;
+  return /local runtime is not ready/i.test(text)
+    || text.includes('initialize 本地电脑')
+    || /check ["']?doubao runtimes["']?/i.test(text);
+}
+
+/** Argv for `doubao runtimes --json` (no binary). */
+export function buildDoubaoRuntimesArgs(platform?: string): string[] {
+  const args: string[] = [];
+  if (platform === 'work' || platform === 'doubao') {
+    args.push('--platform', platform);
+  }
+  args.push('runtimes', '--json');
+  return args;
+}
+
+export interface DoubaoRuntimeRow {
+  id?: string;
+  available?: boolean;
+  status?: string;
+  deviceId?: string;
+}
+
+/** Whether `doubao runtimes --json` reports local READY with a device id. */
+export function isDoubaoLocalRuntimeReady(payload: unknown): boolean {
+  const runtimes = (payload as { runtimes?: DoubaoRuntimeRow[] } | null)?.runtimes;
+  if (!Array.isArray(runtimes)) return false;
+  const local = runtimes.find(r => r?.id === 'local');
+  if (!local) return false;
+  const status = typeof local.status === 'string' ? local.status.toUpperCase() : '';
+  return local.available === true && Boolean(local.deviceId) && (status === 'READY' || status === '');
+}
+
 /** Optional `--mode` override; empty → omit. */
 export function resolveDoubaoMode(envMode?: string | null): DoubaoSessionMode | undefined {
   const trimmed = envMode?.trim().toLowerCase();
